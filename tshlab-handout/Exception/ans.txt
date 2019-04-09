@@ -1,0 +1,2 @@
+Input: WTF
+argv[0] = "./argv"

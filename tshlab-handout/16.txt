@@ -1,0 +1,72 @@
+
+
+
+
+
+
+
+
+
+
+
+
+Test output:
+=====================Wrong!=========================
+tsh> ./myspin1 10 &
+[1] (18631) ./myspin1 10 &
+tsh> ./mytstpp
+Job [2] (18633) stopped by signal 20
+tsh> jobs
+[1] (18631) Running    ./myspin1 10 &
+[2] (18633) Stopped    ./mytstpp
+tsh> bg %2
+[2] (18633) ./mytstpp
+[1] (18631) Running    ./myspin1 10 &              #
+[2] (18633) Running    ./mytstpp		   #
+[3] (18636) Foreground /bin/echo -e tsh\076 jobs   #
+=====================Wrong!=========================
+
+Reference output:
+============================Right Answer====================================
+tsh> ./myspin1 10 &
+[1] (18643) ./myspin1 10 &
+tsh> ./mytstpp
+Job [2] (18645) stopped by signal 20
+tsh> jobs
+[1] (18643) Running    ./myspin1 10 &
+[2] (18645) Stopped    ./mytstpp
+tsh> bg %2
+[2] (18645) ./mytstpp
+tsh> jobs
+[1] (18643) Running    ./myspin1 10 &
+[2] (18645) Running    ./mytstpp
+============================Right Answer====================================
+
+
+
+Output of 'diff test reference':
+5c5
+< [1] (18631) ./myspin1 10 &
+---
+> [1] (18643) ./myspin1 10 &
+7c7
+< Job [2] (18633) stopped by signal 20
+---
+> Job [2] (18645) stopped by signal 20
+9,10c9,10
+< [1] (18631) Running    ./myspin1 10 &
+< [2] (18633) Stopped    ./mytstpp
+---
+> [1] (18643) Running    ./myspin1 10 &
+> [2] (18645) Stopped    ./mytstpp
+12,15c12,15
+< [2] (18633) ./mytstpp
+< [1] (18631) Running    ./myspin1 10 &
+< [2] (18633) Running    ./mytstpp
+< [3] (18636) Foreground /bin/echo -e tsh\076 jobs
+---
+> [2] (18645) ./mytstpp
+> tsh> jobs
+> [1] (18643) Running    ./myspin1 10 &
+> [2] (18645) Running    ./mytstpp
+

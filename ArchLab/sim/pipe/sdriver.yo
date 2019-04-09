@@ -1,0 +1,209 @@
+                      | #######################################################################
+                      | # Test for copying block of size 4;
+                      | #######################################################################
+  0x000:              | 	.pos 0
+  0x000: 30f4c8010000 | main:	irmovl Stack, %esp  	# Set up stack pointer
+  0x006: 30f5c8010000 | 	irmovl Stack, %ebp  	# Set up base pointer
+                      | 
+                      | 	# Set up arguments for copy function and then invoke it
+  0x00c: 30f004000000 | 	irmovl $4, %eax		# src and dst have 4 elements
+  0x012: a00f         | 	pushl %eax
+  0x014: 30f074010000 | 	irmovl dest, %eax	# dst array
+  0x01a: a00f         | 	pushl %eax
+  0x01c: 30f050010000 | 	irmovl src, %eax	# src array
+  0x022: a00f         | 	pushl %eax
+  0x024: 802a000000   | 	call ncopy		 
+  0x029: 00           | 	halt			# should halt with num nonzeros in %eax
+  0x02a:              | StartFun:
+                      | #/* $begin ncopy-ys */
+                      | ##################################################################
+                      | # ncopy.ys - Copy a src block of len ints to dst.
+                      | # Return the number of positive ints (>0) contained in src.
+                      | # 蒋衍 1600013239 出品.
+                      | 
+                      | #######################################################################
+                      | #           Begin of program optimization description                 #
+                      | #######################################################################
+                      | # Modify 1: 4x4 Loop Unrolling. This optimization cut the cycles to 
+                      | #   change source and destination array pointers and conditional jump 
+                      | #   in each loop. 
+                      | # Modify 2: Utilize IIADDQ and ILEAVE to avoid verbose instructions.
+                      | # Modify 3: In each loop, store instruction should begin to be executed
+                      | #   only after load is completed, which causes data dependency and 
+                      | #   wastes much time. So execute two load successively helps to improve 
+                      | #   performance.
+                      | #######################################################################
+                      | #            End of program optimization description                  #
+                      | #######################################################################
+                      | 
+                      | 
+                      | 
+                      | 
+                      | 
+                      | # 不好意思partB忘了写注释了 (T_T) 以下是原本应该在seq-full.hcl的注释...
+                      | 
+                      | #######################################################################
+                      | #           Begin of my description in seq-full.hcl                   #
+                      | #######################################################################
+                      | # For IIADDL instruction in seq-full.hcl:
+                      | #  Fetch:     icode:ifun <- M[PC]
+                      | #             rA:rB <- M[PC+1]
+                      | #             valC <- M[PC+2]
+                      | #             valP <- PC + 6
+                      | #  Decode:    valB <- rB
+                      | #  Execute:   valE <- valB + valC
+                      | #  Memory:  
+                      | #  WriteBack: R[rB] <- valE
+                      | #  Update:    PC <- valP
+                      | #######################################################################
+                      | # For ILEAVE instruction in seq-full.hcl:
+                      | #  Fetch:     icode:ifum <- M[PC]
+                      | #             valP <- PC + 1
+                      | #  Decode:    valA <- R[%ebp]
+                      | #             valB <- R[%ebp]
+                      | #  Execute:   valE <- valB + 4
+                      | #  Memory:    valM <- M[valA]
+                      | #  WriteBack: R[%ebp] <- valM
+                      | #             R[%esp] <- valE
+                      | #  Update:    PC <- valP
+                      | #######################################################################
+                      | #            End of my description in seq-full.hcl                    #
+                      | #######################################################################
+                      | 
+                      | 
+                      | 
+                      | 
+                      | 
+                      | 
+                      | 
+                      | 
+                      | ##################################################################
+                      | # Do not modify this portion
+                      | # Function prologue.
+  0x02a: a05f         | ncopy:	pushl %ebp		# Save old frame pointer
+  0x02c: 2045         | 	rrmovl %esp,%ebp	# Set up new frame pointer
+  0x02e: a06f         | 	pushl %esi		# Save callee-save regs
+  0x030: a03f         | 	pushl %ebx
+  0x032: a07f         | 	pushl %edi
+  0x034: 503508000000 | 	mrmovl 8(%ebp),%ebx	# src
+  0x03a: 502510000000 | 	mrmovl 16(%ebp),%edx	# len
+  0x040: 50150c000000 | 	mrmovl 12(%ebp),%ecx	# dst
+                      | 
+                      | ##################################################################
+                      | # You can modify this portion   # src in %ebx, len in %edx, dst in %ecx
+                      | 	# Loop header
+  0x046: 6300         | 	xorl %eax,%eax		# count = 0;
+  0x048: c0f2fcffffff | 	iaddl $0xfffffffc, %edx # len -= 4
+  0x04e: 72ce000000   | 	jl Tail1	        # goto Tail1 only if (len < 0)
+                      | 	
+  0x053: 506300000000 | First:	mrmovl (%ebx), %esi	# 1st load
+  0x059: 507304000000 | 	mrmovl 4(%ebx), %edi    # 2nd load
+  0x05f: 406100000000 | 	rmmovl %esi, (%ecx)	# 1st save
+  0x065: 407104000000 | 	rmmovl %edi, 4(%ecx)    # 2nd save
+  0x06b: 6266         | 	andl %esi, %esi		# val <= 0?
+  0x06d: 7178000000   | 	jle Second		# if so, goto Npos:
+  0x072: c0f001000000 | 	iaddl $1, %eax          # cnt ++
+  0x078: 6277         | Second: andl %edi, %edi
+  0x07a: 7185000000   |         jle Third
+  0x07f: c0f001000000 |         iaddl $1, %eax
+  0x085: 506308000000 | Third:  mrmovl 8(%ebx), %esi    # 3rd load
+  0x08b: 50730c000000 |         mrmovl 12(%ebx), %edi   # 4th load
+  0x091: 406108000000 |         rmmovl %esi, 8(%ecx)    # 3rd save
+  0x097: 40710c000000 |         rmmovl %edi, 12(%ecx)   # 4th save
+  0x09d: 6266         |         andl %esi, %esi
+  0x09f: 71aa000000   |         jle Forth
+  0x0a4: c0f001000000 |         iaddl $1, %eax
+  0x0aa: 6277         | Forth:  andl %edi, %edi
+  0x0ac: 71b7000000   |         jle Npos
+  0x0b1: c0f001000000 |         iaddl $1, %eax
+                      | 
+  0x0b7: c0f310000000 | Npos:	iaddl $16, %ebx		# src += 16
+  0x0bd: c0f110000000 | 	iaddl $16, %ecx		# dst += 16
+  0x0c3: c0f2fcffffff | 	iaddl $0xfffffffc, %edx # len -= 9
+  0x0c9: 7553000000   | 	jge First		# goto Tail1 only if (len < 0)
+                      | 	
+  0x0ce: c0f204000000 | Tail1:  iaddl $4, %edx
+  0x0d4: 713a010000   | 	jle Don                 # exit if len <= 0
+  0x0d9: 506300000000 | 	mrmovl (%ebx), %esi	# read val from src...
+  0x0df: 507304000000 | 	mrmovl 4(%ebx), %edi
+  0x0e5: 406100000000 | 	rmmovl %esi, (%ecx)	# ...and store it to dst
+  0x0eb: 6266         | 	andl %esi, %esi		# val <= 0?
+  0x0ed: 71f8000000   | 	jle Test2 		# 
+  0x0f2: c0f001000000 | 	iaddl $1, %eax          # cnt ++
+  0x0f8: c0f2ffffffff | Test2:  iaddl $0xffffffff, %edx # len--
+  0x0fe: 713a010000   | 	jle Don
+  0x103: 506308000000 |         mrmovl 8(%ebx), %esi
+  0x109: 407104000000 |         rmmovl %edi, 4(%ecx)
+  0x10f: 6277         |         andl %edi, %edi
+  0x111: 711c010000   |         jle Test3
+  0x116: c0f001000000 |         iaddl $1, %eax
+  0x11c: c0f2ffffffff | Test3:  iaddl $0xffffffff, %edx # len--
+  0x122: 713a010000   | 	jle Don
+  0x127: 406108000000 |         rmmovl %esi, 8(%ecx)
+  0x12d: 6266         |         andl %esi, %esi
+  0x12f: 713a010000   |         jle Don
+  0x134: c0f001000000 |         iaddl $1, %eax
+                      |         
+  0x13a: b07f         | Don:    popl %edi               # Restore callee-save registers
+  0x13c: b03f         | 	popl %ebx
+  0x13e: b06f         | 	popl %esi
+  0x140: d0           | 	leave
+  0x141: 90           | 	ret
+                      | ##################################################################
+                      | # Do not modify the following section of code
+                      | # Function epilogue.
+  0x142:              | Done:
+  0x142: b07f         | 	popl %edi               # Restore callee-save registers
+  0x144: b03f         | 	popl %ebx
+  0x146: b06f         | 	popl %esi
+  0x148: 2054         | 	rrmovl %ebp, %esp
+  0x14a: b05f         | 	popl %ebp
+  0x14c: 90           | 	ret
+                      | ##################################################################
+                      | # Keep the following label at the end of your function
+  0x14d:              | End:
+                      | #/* $end ncopy-ys */
+  0x14d:              | EndFun:
+                      | 
+                      | ###############################
+                      | # Source and destination blocks 
+                      | ###############################
+  0x150:              | 	.align 4
+  0x150:              | src:
+  0x150: 01000000     | 	.long 1
+  0x154: feffffff     | 	.long -2
+  0x158: 03000000     | 	.long 3
+  0x15c: 00000000     | 	.long 0
+  0x160: fadebc00     | 	.long 0xbcdefa # This shouldn't get moved
+                      | 
+  0x170:              | 	.align 16
+  0x170:              | Predest:
+  0x170: fadebc00     | 	.long 0xbcdefa
+  0x174:              | dest:
+  0x174: abefcd00     | 	.long 0xcdefab
+  0x178: abefcd00     | 	.long 0xcdefab
+  0x17c: abefcd00     | 	.long 0xcdefab
+  0x180: abefcd00     | 	.long 0xcdefab
+  0x184:              | Postdest:
+  0x184: bcfade00     | 	.long 0xdefabc
+                      | 
+  0x188:              | .align 4
+                      | # Run time stack
+  0x188: 00000000     | 	.long 0
+  0x18c: 00000000     | 	.long 0
+  0x190: 00000000     | 	.long 0
+  0x194: 00000000     | 	.long 0
+  0x198: 00000000     | 	.long 0
+  0x19c: 00000000     | 	.long 0
+  0x1a0: 00000000     | 	.long 0
+  0x1a4: 00000000     | 	.long 0
+  0x1a8: 00000000     | 	.long 0
+  0x1ac: 00000000     | 	.long 0
+  0x1b0: 00000000     | 	.long 0
+  0x1b4: 00000000     | 	.long 0
+  0x1b8: 00000000     | 	.long 0
+  0x1bc: 00000000     | 	.long 0
+  0x1c0: 00000000     | 	.long 0
+  0x1c4: 00000000     | 	.long 0
+                      | 
+  0x1c8:              | Stack:

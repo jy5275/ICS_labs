@@ -1,0 +1,72 @@
+/* 蒋衍 1600013239 出品 */
+# Execution begins at address 0 
+	.pos 0 
+init:	irmovl Stack, %esp  	# Set up stack pointer  
+	irmovl Stack, %ebp  	# Set up base pointer   
+	call main		# Execute main program
+	halt			# Terminate program 
+	
+	.align 4
+# Source block
+src:
+        .long 0x00a
+        .long 0x0b0
+        .long 0xc00
+# Destination block
+dest:
+        .long 0x111
+        .long 0x222
+        .long 0x333
+
+main:	pushl  %ebp 
+	rrmovl %esp,%ebp
+	irmovl src,%edx	
+	pushl  %edx      	# push src (pass arg1)
+	irmovl dest,%edx
+	pushl  %edx             # push dest (pass arg2)
+	irmovl $3,%edx
+	pushl  %edx             # push len (pass arg3)
+	call   copy	        # call copy(src,dext,len=3)
+	rrmovl %ebp,%esp
+	popl   %ebp
+	ret 
+	
+/* $begin copy (src,dest,len) */
+	# int copy(int *src(ecx), int *dest(edx), int len(ebx))   # All saved in stack (above ret addr) 
+copy:
+	pushl  %ebp
+	rrmovl %esp,%ebp
+	pushl  %edi
+	pushl  %esi
+	pushl  %ebx
+	irmovl $1,%esi
+	mrmovl 8(%ebp),%ebx 	# ebx = len
+	mrmovl 12(%ebp),%edx    # edx = dest
+	mrmovl 16(%ebp),%ecx    # ecx = src
+	xorl   %eax,%eax	# sum = 0
+	andl   %ebx,%ebx        # break if (ebx == 0)
+	jmp    test
+loop:
+        mrmovl (%ecx),%edi      # edi(val) = *ecx(*src)
+        irmovl $4,%esi
+        addl   %esi,%ecx        # ecx+4(src++)
+        rmmovl %edi,(%edx)      # *edx(*dest) = val
+        addl   %esi,%edx        # edx+4(dest++)
+        xorl   %edi,%eax        # eax(result) = eax(result) ^ edi(val)
+        irmovl $1,%esi
+        subl   %esi,%ebx        # ebx--(len--)
+test:
+        jne    loop
+     	
+end:	
+        popl   %ebx
+        popl   %esi
+        popl   %edi
+        rrmovl %ebp,%esp
+	popl   %ebp
+	ret
+/* $end copy */
+
+# The stack starts here and grows to lower addresses
+	.pos 0x100		
+Stack:	 
